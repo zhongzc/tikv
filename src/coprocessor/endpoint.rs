@@ -1,5 +1,6 @@
 // Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
@@ -426,7 +427,7 @@ impl<E: Engine> Endpoint<E> {
         req: coppb::Request,
         peer: Option<String>,
     ) -> impl Future<Item = coppb::Response, Error = ()> {
-        let (tx, mut rx) = minitrace::Collector::bounded(100);
+        let (tx, mut rx) = minitrace::Collector::bounded(700);
         let _enable_trace = req.enable_trace;
         //TODO remove before merge
         let enable_trace = true;
@@ -454,8 +455,8 @@ impl<E: Engine> Endpoint<E> {
                 if let Some(reporter) = reporter {
                     reporter
                         .report(&finished_spans, |s| {
-                            let event: TraceEvent = s.into();
-                            format!("{:?}", event)
+                            let event = TraceEvent::try_from(s).unwrap_or(TraceEvent::Unknown);
+                            event.to_string()
                         })
                         .unwrap();
                 }

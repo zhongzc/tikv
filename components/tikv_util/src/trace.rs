@@ -1,6 +1,8 @@
 use kvproto::span as spanpb;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use std::convert::TryFrom;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Display, Debug, Eq, PartialEq, TryFromPrimitive, IntoPrimitive)]
 #[repr(u32)]
 pub enum TraceEvent {
     #[allow(dead_code)]
@@ -26,39 +28,6 @@ pub enum TraceEvent {
     IndexScan,
 }
 
-impl Into<u32> for TraceEvent {
-    fn into(self) -> u32 {
-        self as u32
-    }
-}
-
-impl From<u32> for TraceEvent {
-    fn from(x: u32) -> Self {
-        match x {
-            _ if x == TraceEvent::CoprRequest as u32 => TraceEvent::CoprRequest,
-            _ if x == TraceEvent::HandleUnaryRequest as u32 => TraceEvent::HandleUnaryRequest,
-            _ if x == TraceEvent::Snapshot as u32 => TraceEvent::Snapshot,
-            _ if x == TraceEvent::HandleChecksum as u32 => TraceEvent::HandleChecksum,
-            _ if x == TraceEvent::HandleDag as u32 => TraceEvent::HandleDag,
-            _ if x == TraceEvent::HandleBatchDag as u32 => TraceEvent::HandleBatchDag,
-            _ if x == TraceEvent::HandleAnalyze as u32 => TraceEvent::HandleAnalyze,
-            _ if x == TraceEvent::HandleCached as u32 => TraceEvent::HandleCached,
-            _ if x == TraceEvent::BatchHandle as u32 => TraceEvent::BatchHandle,
-            _ if x == TraceEvent::BatchHandleLoop as u32 => TraceEvent::BatchHandleLoop,
-            _ if x == TraceEvent::TopN as u32 => TraceEvent::TopN,
-            _ if x == TraceEvent::TableScan as u32 => TraceEvent::TableScan,
-            _ if x == TraceEvent::StreamAgg as u32 => TraceEvent::StreamAgg,
-            _ if x == TraceEvent::SlowHashAgg as u32 => TraceEvent::SlowHashAgg,
-            _ if x == TraceEvent::SimpleAgg as u32 => TraceEvent::SimpleAgg,
-            _ if x == TraceEvent::Selection as u32 => TraceEvent::Selection,
-            _ if x == TraceEvent::FastHashAgg as u32 => TraceEvent::FastHashAgg,
-            _ if x == TraceEvent::Limit as u32 => TraceEvent::Limit,
-            _ if x == TraceEvent::IndexScan as u32 => TraceEvent::IndexScan,
-            _  => TraceEvent::Unknown,
-        }
-    }
-}
-
 impl Into<spanpb::Event> for TraceEvent {
     fn into(self) -> spanpb::Event {
         match self {
@@ -80,7 +49,11 @@ pub fn encode_spans(finished_spans: Vec<minitrace::Span>) -> impl Iterator<Item 
         s.set_id(span.id.into());
         s.set_start(span.elapsed_start);
         s.set_end(span.elapsed_end);
-        s.set_event(TraceEvent::from(span.tag).into());
+        s.set_event(
+            TraceEvent::try_from(span.tag)
+                .unwrap_or(TraceEvent::Unknown)
+                .into(),
+        );
 
         #[cfg(feature = "prost-codec")]
         {
