@@ -18,6 +18,7 @@ use tidb_query_datatype::expr::{EvalConfig, EvalContext};
 use tidb_query_vec_aggr::*;
 use tidb_query_vec_expr::RpnStackNode;
 use tidb_query_vec_expr::{RpnExpression, RpnExpressionBuilder};
+use tikv_util::trace::TraceEvent;
 
 pub struct BatchStreamAggregationExecutor<Src: BatchExecutor>(
     AggregationExecutor<Src, BatchStreamAggregationImpl>,
@@ -32,6 +33,7 @@ impl<Src: BatchExecutor> BatchExecutor for BatchStreamAggregationExecutor<Src> {
     }
 
     #[inline]
+    #[minitrace::trace(TraceEvent::StreamAgg)]
     fn next_batch(&mut self, scan_rows: usize) -> BatchExecuteResult {
         self.0.next_batch(scan_rows)
     }

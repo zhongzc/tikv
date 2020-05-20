@@ -17,6 +17,8 @@ use tidb_query_common::metrics::*;
 use tidb_query_common::storage::Storage;
 use tidb_query_common::Result;
 use tidb_query_datatype::expr::{EvalConfig, EvalContext};
+use tikv_util::trace::TraceEvent;
+use minitrace::prelude::*;
 
 // TODO: The value is chosen according to some very subjective experience, which is not tuned
 // carefully. We need to benchmark to find a best value. Also we may consider accepting this value
@@ -340,6 +342,7 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
         })
     }
 
+    #[minitrace::trace_async(TraceEvent::BatchHandle)]
     pub async fn handle_request(&mut self) -> Result<SelectResponse> {
         let mut chunks = vec![];
         let mut batch_size = BATCH_INITIAL_SIZE;
@@ -354,6 +357,9 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
                 reschedule().await;
                 time_slice_start = Instant::now();
             }
+
+            let span = minitrace::new_span(TraceEvent::BatchHandleLoop);
+            let _enter = span.enter();
 
             self.deadline.check()?;
 

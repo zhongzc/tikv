@@ -5,6 +5,7 @@ use tipb::FieldType;
 use crate::interface::*;
 use tidb_query_common::storage::IntervalRange;
 use tidb_query_common::Result;
+use tikv_util::trace::TraceEvent;
 
 /// Executor that retrieves rows from the source executor
 /// and only produces part of the rows.
@@ -31,6 +32,7 @@ impl<Src: BatchExecutor> BatchExecutor for BatchLimitExecutor<Src> {
     }
 
     #[inline]
+    #[minitrace::trace(TraceEvent::Limit)]
     fn next_batch(&mut self, scan_rows: usize) -> BatchExecuteResult {
         let mut result = self.src.next_batch(scan_rows);
         if result.logical_rows.len() < self.remaining_rows {

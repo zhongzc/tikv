@@ -17,6 +17,7 @@ use tidb_query_datatype::expr::EvalWarnings;
 use tidb_query_datatype::expr::{EvalConfig, EvalContext};
 use tidb_query_vec_expr::RpnStackNode;
 use tidb_query_vec_expr::{RpnExpression, RpnExpressionBuilder};
+use tikv_util::trace::TraceEvent;
 
 pub struct BatchTopNExecutor<Src: BatchExecutor> {
     /// The heap, which contains N rows at most.
@@ -288,6 +289,7 @@ impl<Src: BatchExecutor> BatchExecutor for BatchTopNExecutor<Src> {
     }
 
     #[inline]
+    #[minitrace::trace(TraceEvent::TopN)]
     fn next_batch(&mut self, _scan_rows: usize) -> BatchExecuteResult {
         assert!(!self.is_ended);
 

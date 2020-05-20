@@ -30,7 +30,7 @@ use crate::coprocessor::interceptors::track;
 use crate::coprocessor::metrics::*;
 use crate::coprocessor::tracker::Tracker;
 use crate::coprocessor::*;
-use minitrace::future::Instrument;
+use minitrace::prelude::*;
 use tikv_util::trace::TraceEvent;
 
 /// Requests that need time of less than `LIGHT_TASK_THRESHOLD` is considered as light ones,
@@ -58,6 +58,8 @@ pub struct Endpoint<E: Engine> {
     /// The soft time limit of handling Coprocessor requests.
     max_handle_duration: Duration,
 
+    minitrace_reporter: Option<Arc<minitrace_jaeger::JaegerCompactReporter>>,
+
     _phantom: PhantomData<E>,
 }
 
@@ -66,6 +68,7 @@ impl<E: Engine> Clone for Endpoint<E> {
         Self {
             read_pool: self.read_pool.clone(),
             semaphore: self.semaphore.clone(),
+            minitrace_reporter: self.minitrace_reporter.clone(),
             ..*self
         }
     }
@@ -84,6 +87,11 @@ impl<E: Engine> Endpoint<E> {
             }
             _ => None,
         };
+
+        let minitrace_reporter = minitrace_jaeger::JaegerCompactReporter::new("TiKV")
+            .map(Arc::new)
+            .ok();
+
         Self {
             read_pool,
             semaphore,
@@ -93,6 +101,7 @@ impl<E: Engine> Endpoint<E> {
             stream_batch_row_limit: cfg.end_point_stream_batch_row_limit,
             stream_channel_size: cfg.end_point_stream_channel_size,
             max_handle_duration: cfg.end_point_request_max_handle_duration.0,
+            minitrace_reporter,
             _phantom: Default::default(),
         }
     }
@@ -332,17 +341,16 @@ impl<E: Engine> Endpoint<E> {
         // When this function is being executed, it may be queued for a long time, so that
         // deadline may exceed.
         tracker.on_scheduled();
-        minitrace::new_span(TraceEvent::Scheduled).enter();
         tracker.req_ctx.deadline.check()?;
 
         // Safety: spawning this function using a `FuturePool` ensures that a TLS engine
         // exists.
-        let snapshot_span = minitrace::new_span(TraceEvent::Snapshot);
         let snapshot = unsafe {
             with_tls_engine(|engine| Self::async_snapshot(engine, &tracker.req_ctx.context))
         }
+        .in_current_span(TraceEvent::Snapshot)
         .await?;
-        std::mem::drop(snapshot_span);
+
         // When snapshot is retrieved, deadline may exceed.
         tracker.on_snapshot_finished();
         tracker.req_ctx.deadline.check()?;
@@ -358,12 +366,7 @@ impl<E: Engine> Endpoint<E> {
 
         tracker.on_begin_all_items();
 
-        let handle_request_future = track(
-            handler
-                .handle_request()
-                .in_current_span(TraceEvent::HandleRequest),
-            &mut tracker,
-        );
+        let handle_request_future = track(handler.handle_request(), &mut tracker);
         let result = if let Some(semaphore) = &semaphore {
             limit_concurrency(handle_request_future, semaphore, LIGHT_TASK_THRESHOLD).await
         } else {
@@ -405,7 +408,8 @@ impl<E: Engine> Endpoint<E> {
 
         self.read_pool
             .spawn_handle(
-                Self::handle_unary_request_impl(self.semaphore.clone(), tracker, handler_builder),
+                Self::handle_unary_request_impl(self.semaphore.clone(), tracker, handler_builder)
+                    .in_current_span(TraceEvent::HandleUnaryRequest),
                 priority,
                 task_id,
             )
@@ -422,7 +426,7 @@ impl<E: Engine> Endpoint<E> {
         req: coppb::Request,
         peer: Option<String>,
     ) -> impl Future<Item = coppb::Response, Error = ()> {
-        let (tx, rx) = minitrace::Collector::unbounded();
+        let (tx, mut rx) = minitrace::Collector::bounded(100);
         let _enable_trace = req.enable_trace;
         //TODO remove before merge
         let enable_trace = true;
@@ -432,18 +436,31 @@ impl<E: Engine> Endpoint<E> {
         } else {
             minitrace::none()
         };
-        let result_of_future =
-            self.parse_request(req, peer, false)
-                .map(|(handler_builder, req_ctx)| {
-                    self.handle_unary_request(req_ctx, handler_builder)
-                        .instrument(span_root)
-                });
+
+        let _enter = span_root.enter();
+
+        let result_of_future = self
+            .parse_request(req, peer, false)
+            .map(|(handler_builder, req_ctx)| self.handle_unary_request(req_ctx, handler_builder));
+
+        let reporter = self.minitrace_reporter.clone();
 
         future::result(result_of_future)
             .flatten()
             .or_else(|e| Ok(make_error_response(e)))
             .map(move |mut resp: coppb::Response| {
-                resp.set_spans(tikv_util::trace::encode_spans(rx).collect());
+                let finished_spans = rx.collect().unwrap();
+
+                if let Some(reporter) = reporter {
+                    reporter
+                        .report(&finished_spans, |s| {
+                            let event: TraceEvent = s.into();
+                            format!("{:?}", event)
+                        })
+                        .unwrap();
+                }
+
+                resp.set_spans(tikv_util::trace::encode_spans(finished_spans).collect());
                 resp
             })
     }
@@ -652,7 +669,6 @@ mod tests {
 
     #[async_trait]
     impl RequestHandler for UnaryFixture {
-        #[minitrace::trace(TraceEvent::HandleUnaryFixture)]
         async fn handle_request(&mut self) -> Result<coppb::Response> {
             thread::sleep(Duration::from_millis(self.handle_duration_millis));
             self.result.take().unwrap()

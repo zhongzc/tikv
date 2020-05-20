@@ -22,6 +22,7 @@ use tidb_query_datatype::expr::{EvalConfig, EvalContext};
 use tidb_query_vec_aggr::*;
 use tidb_query_vec_expr::RpnStackNode;
 use tidb_query_vec_expr::{RpnExpression, RpnExpressionBuilder};
+use tikv_util::trace::TraceEvent;
 
 /// Slow Hash Aggregation Executor supports multiple groups but uses less efficient ways to
 /// store group keys in hash tables.
@@ -41,6 +42,7 @@ impl<Src: BatchExecutor> BatchExecutor for BatchSlowHashAggregationExecutor<Src>
     }
 
     #[inline]
+    #[minitrace::trace(TraceEvent::SlowHashAgg)]
     fn next_batch(&mut self, scan_rows: usize) -> BatchExecuteResult {
         self.0.next_batch(scan_rows)
     }

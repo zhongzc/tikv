@@ -155,6 +155,7 @@ uuid = { version = "0.8.1", features = ["serde", "v4"] }
 vlog = "0.1.4"
 walkdir = "2"
 minitrace = { git = "https://github.com/zhongzc/minitrace.git", branch = "master" }
+minitrace-jaeger = { git = "https://github.com/zhongzc/minitrace-jaeger.git", branch = "master" }
 
 
 [dependencies.prometheus-static-metric]
@@ -182,7 +183,7 @@ fail = { git = "https://github.com/tikv/fail-rs.git", rev = "2cf1175a1a5cc2c70bd
 prometheus = { git = "https://github.com/tikv/rust-prometheus.git", rev = "fd122caa03de8e7e5e4fae9372583aebf19e39f6" }
 
 [patch.'https://github.com/pingcap/kvproto.git']
-kvproto = {git = "https://github.com/renkai/kvproto",branch = "minitrace"}
+kvproto = { git = "https://github.com/renkai/kvproto", branch = "minitrace" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procinfo = { git = "https://github.com/tikv/procinfo-rs", rev = "5125fc1a69496b73b26b3c08b6e8afc3c665a56e" }

@@ -22,6 +22,7 @@ use tidb_query_datatype::codec::data_type::*;
 use tidb_query_datatype::expr::{EvalConfig, EvalContext};
 use tidb_query_vec_aggr::*;
 use tidb_query_vec_expr::{RpnExpression, RpnExpressionBuilder, RpnStackNode};
+use tikv_util::trace::TraceEvent;
 
 pub macro match_template_hashable($t:tt, $($tail:tt)*) {
     match_template::match_template! {
@@ -45,6 +46,7 @@ impl<Src: BatchExecutor> BatchExecutor for BatchFastHashAggregationExecutor<Src>
     }
 
     #[inline]
+    #[minitrace::trace(TraceEvent::FastHashAgg)]
     fn next_batch(&mut self, scan_rows: usize) -> BatchExecuteResult {
         self.0.next_batch(scan_rows)
     }
