@@ -10,7 +10,7 @@ use futures03::channel::mpsc;
 use futures03::prelude::*;
 use tokio::sync::Semaphore;
 
-use kvproto::{coprocessor as coppb, errorpb, kvrpcpb};
+use kvproto::{coprocessor as coppb, errorpb, kvrpcpb, span as spanpb};
 #[cfg(feature = "protobuf-codec")]
 use protobuf::CodedInputStream;
 use protobuf::Message;
@@ -420,8 +420,9 @@ impl<E: Engine> Endpoint<E> {
             .or_else(|e| Ok(make_error_response(e)))
             .map(move |mut resp| {
                 if let Some(collector) = collector {
-                    let span_sets = collector.collect();
-                    resp.set_spans(tikv_util::trace::encode_spans(span_sets).collect())
+                    let mut trace_detail = spanpb::TraceDetail::default();
+                    trace_detail.set_span_sets(tikv_util::trace::encode_spans(collector.collect()).collect());
+                    resp.set_trace_detail(trace_detail);
                 }
                 resp
             })
