@@ -1156,14 +1156,18 @@ fn future_get<E: Engine, L: LockManager>(
     storage: &Storage<E, L>,
     mut req: GetRequest,
 ) -> impl Future<Item = GetResponse, Error = Error> {
+    let (_root, collector) = minitrace::trace_enable(0u32);
     storage
         .get(
             req.take_context(),
             Key::from_raw(req.get_key()),
             req.get_version().into(),
         )
-        .then(|v| {
+        .then(move |v| {
             let mut resp = GetResponse::default();
+            let span_sets = collector.collect();
+            resp.set_span_sets(tikv_util::trace::encode_spans(span_sets).collect());
+
             if let Some(err) = extract_region_error(&v) {
                 resp.set_region_error(err);
             } else {

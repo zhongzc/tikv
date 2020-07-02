@@ -49,6 +49,7 @@ use engine_traits::{IterOptions, DATA_KEY_PREFIX_LEN};
 use futures::Future;
 use futures03::prelude::*;
 use kvproto::kvrpcpb::{CommandPri, Context, GetRequest, KeyRange, RawGetRequest};
+use minitrace::prelude::*;
 use raftstore::store::util::build_key_range;
 use rand::prelude::*;
 use std::sync::{atomic, Arc};
@@ -227,11 +228,19 @@ impl<E: Engine, L: LockManager> Storage<E, L> {
 
                 let command_duration = tikv_util::time::Instant::now_coarse();
 
+                for i in 0..50 {
+                    let _g = minitrace::new_span(i as u32);
+                }
+
                 // The bypass_locks set will be checked at most once. `TsSet::vec` is more efficient
                 // here.
                 let bypass_locks = TsSet::vec_from_u64s(ctx.take_resolved_locks());
                 let snapshot = Self::with_tls_engine(|engine| Self::snapshot(engine, &ctx)).await?;
                 {
+                    for i in 0..50 {
+                        let _g = minitrace::new_span(i as u32);
+                    }
+
                     let begin_instant = Instant::now_coarse();
                     let mut statistics = Statistics::default();
                     let snap_store = SnapshotStore::new(
@@ -262,7 +271,8 @@ impl<E: Engine, L: LockManager> Storage<E, L> {
 
                     result
                 }
-            },
+            }
+            .trace_task(1u32),
             priority,
             thread_rng().next_u64(),
         );
