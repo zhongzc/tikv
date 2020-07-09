@@ -124,6 +124,47 @@ pub fn decode_spans(span_sets: Vec<spanpb::SpanSet>) -> impl Iterator<Item = Spa
     })
 }
 
+pub fn memcopy(span_sets: Vec<SpanSet>) -> Vec<u8> {
+    let size: usize = span_sets
+        .iter()
+        .map(|span_set| {
+            span_set.spans.len() * std::mem::size_of::<minitrace::Span>()
+                + std::mem::size_of::<u64>() * 3
+        })
+        .sum();
+
+    let mut buf = Vec::<u8>::with_capacity(size);
+    unsafe { buf.set_len(size) };
+    let mut cur_ptr = buf.as_mut_ptr();
+    for span_set in span_sets {
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &span_set.create_time_ns as *const _ as *const u8,
+                cur_ptr,
+                8,
+            );
+            cur_ptr = cur_ptr.offset(8);
+            std::ptr::copy_nonoverlapping(
+                &span_set.start_time_ns as *const _ as *const u8,
+                cur_ptr,
+                8,
+            );
+            cur_ptr = cur_ptr.offset(8);
+            std::ptr::copy_nonoverlapping(
+                &span_set.cycles_per_sec as *const _ as *const u8,
+                cur_ptr,
+                8,
+            );
+            cur_ptr = cur_ptr.offset(8);
+            let span_size = span_set.spans.len() * std::mem::size_of::<minitrace::Span>();
+            std::ptr::copy_nonoverlapping(span_set.spans.as_ptr() as *const u8, cur_ptr, span_size);
+            cur_ptr = cur_ptr.offset(span_size as isize);
+        }
+    }
+
+    buf
+}
+
 #[cfg(test)]
 mod tests {
     use minitrace::{Link, Span, SpanSet};
