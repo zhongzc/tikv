@@ -218,6 +218,10 @@ impl<S: Snapshot> Store for SnapshotStore<S> {
             .multi(false)
             .bypass_locks(self.bypass_locks.clone())
             .build()?;
+
+        for i in 0..50 {
+            let _g = minitrace::new_span(i as u32);
+        }
         let v = point_getter.get(key)?;
         statistics.add(&point_getter.take_statistics());
         Ok(v)

@@ -228,19 +228,11 @@ impl<E: Engine, L: LockManager> Storage<E, L> {
 
                 let command_duration = tikv_util::time::Instant::now_coarse();
 
-                for i in 0..50 {
-                    let _g = minitrace::new_span(i as u32);
-                }
-
                 // The bypass_locks set will be checked at most once. `TsSet::vec` is more efficient
                 // here.
                 let bypass_locks = TsSet::vec_from_u64s(ctx.take_resolved_locks());
                 let snapshot = Self::with_tls_engine(|engine| Self::snapshot(engine, &ctx)).await?;
                 {
-                    for i in 0..50 {
-                        let _g = minitrace::new_span(i as u32);
-                    }
-
                     let begin_instant = Instant::now_coarse();
                     let mut statistics = Statistics::default();
                     let snap_store = SnapshotStore::new(
@@ -272,7 +264,7 @@ impl<E: Engine, L: LockManager> Storage<E, L> {
                     result
                 }
             }
-            .trace_task(1u32),
+            .trace_task(300u32),
             priority,
             thread_rng().next_u64(),
         );
@@ -352,7 +344,7 @@ impl<E: Engine, L: LockManager> Storage<E, L> {
 
                     Ok(results)
                 }
-            },
+            }.trace_task(200u32),
             priority,
             thread_rng().next_u64(),
         );
@@ -436,7 +428,7 @@ impl<E: Engine, L: LockManager> Storage<E, L> {
                         .observe(command_duration.elapsed_secs());
                     result
                 }
-            },
+            }.trace_task(100u32),
             priority,
             thread_rng().next_u64(),
         );

@@ -184,6 +184,10 @@ impl<S: Snapshot> PointGetter<S> {
             IsolationLevel::Rc => {}
         }
 
+        for i in 0..50 {
+            let _g = minitrace::new_span(i as u32);
+        }
+
         self.load_data(user_key)
     }
 

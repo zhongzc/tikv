@@ -1189,12 +1189,14 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
 ) -> impl Future<Item = (), Error = ()> {
     let begin_instant = Instant::now_coarse();
 
+    let (_root, collector) = minitrace::trace_enable(0u32);
     storage.batch_get_command(commands).then(move |v| {
         match v {
             Ok(v) => {
                 if requests.len() != v.len() {
                     error!("KvService batch response size mismatch");
                 }
+                let mut collector = Some(collector);
                 for (req, v) in requests.into_iter().zip(v.into_iter()) {
                     let mut resp = GetResponse::default();
                     if let Some(err) = extract_region_error(&v) {
@@ -1205,6 +1207,10 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                             Ok(None) => resp.set_not_found(true),
                             Err(e) => resp.set_error(extract_key_error(&e)),
                         }
+                    }
+                    if let Some(collector) = collector.take() {
+                        let span_sets = collector.collect();
+                        resp.set_span_sets(tikv_util::trace::encode_spans(span_sets).collect());
                     }
                     let mut res = batch_commands_response::Response::default();
                     res.cmd = Some(batch_commands_response::response::Cmd::Get(resp));
