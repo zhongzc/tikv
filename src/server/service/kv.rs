@@ -1209,10 +1209,11 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                         }
                     }
                     if let Some(collector) = collector.take() {
-                        let span_sets = collector.collect();
+                        let _span_sets = collector.collect();
                         // resp.set_span_sets(tikv_util::trace::encode_spans(span_sets).collect());
                         // resp.set_span_results(tikv_util::trace::memcopy(span_sets));
-                        let _c = tikv_util::trace::memcopy(span_sets);
+                        // let _c = tikv_util::trace::memcopy(span_sets);
+                        resp.set_span_results(vec![0; 5000]);
                     }
                     let mut res = batch_commands_response::Response::default();
                     res.cmd = Some(batch_commands_response::response::Cmd::Get(resp));
