@@ -1167,14 +1167,15 @@ fn future_get<E: Engine, L: LockManager>(
         .then(move |v| {
             let mut resp = GetResponse::default();
             let trace_details = collector.collect();
-            if trace_details.elapsed_ns > 10_000_000 {
-                resp.set_span_sets(
-                    tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
-                );
-            }
+            // if trace_details.elapsed_ns > 10_000_000 {
+            //     resp.set_span_sets(
+            //         tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
+            //     );
+            // }
             // tikv_util::trace::encode_spans(trace_details.span_sets)
-                // .map(|span_set| span_set.write_to_bytes())
-                // .for_each(drop);
+            // .map(|span_set| span_set.write_to_bytes())
+            // .for_each(drop);
+            resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
 
             if let Some(err) = extract_region_error(&v) {
                 resp.set_region_error(err);
@@ -1220,14 +1221,14 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                         let trace_details = collector.collect();
 
                         // tikv_util::trace::encode_spans(trace_details.span_sets)
-                            // .map(|span_set| span_set.write_to_bytes())
-                            // .for_each(drop);
-                        if trace_details.elapsed_ns > 10_000_000 {
-                            resp.set_span_sets(
-                                tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
-                            );
-                        }
-                        // resp.set_span_results(tikv_util::trace::memcopy(span_sets));
+                        // .map(|span_set| span_set.write_to_bytes())
+                        // .for_each(drop);
+                        // if trace_details.elapsed_ns > 10_000_000 {
+                        //     resp.set_span_sets(
+                        //         tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
+                        //     );
+                        // }
+                        resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
                         // let _c = tikv_util::trace::memcopy(span_sets);
                         // resp.set_span_results(vec![0; 5000]);
                     }
