@@ -1153,6 +1153,14 @@ fn future_handle_empty(
     }
 }
 
+fn black_box<T>(dummy: T) -> T {
+    unsafe {
+        let ret = std::ptr::read_volatile(&dummy);
+        std::mem::forget(dummy);
+        ret
+    }
+}
+
 fn future_get<E: Engine, L: LockManager>(
     storage: &Storage<E, L>,
     mut req: GetRequest,
@@ -1175,7 +1183,8 @@ fn future_get<E: Engine, L: LockManager>(
             // tikv_util::trace::encode_spans(trace_details.span_sets)
             // .map(|span_set| span_set.write_to_bytes())
             // .for_each(drop);
-            resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
+            // resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
+            let _c = black_box(tikv_util::trace::memcopy(trace_details.span_sets));
 
             if let Some(err) = extract_region_error(&v) {
                 resp.set_region_error(err);
@@ -1228,8 +1237,8 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                         //         tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
                         //     );
                         // }
-                        resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
-                        // let _c = tikv_util::trace::memcopy(span_sets);
+                        // resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
+                        let _c = black_box(tikv_util::trace::memcopy(trace_details.span_sets));
                         // resp.set_span_results(vec![0; 5000]);
                     }
                     let mut res = batch_commands_response::Response::default();
