@@ -1166,11 +1166,11 @@ fn future_get<E: Engine, L: LockManager>(
         .then(move |v| {
             let mut resp = GetResponse::default();
             let trace_details = collector.collect();
-            if trace_details.elapsed_ns > 1_000_000 {
+            // if trace_details.elapsed_ns > 1_000_000 {
                 resp.set_span_sets(
                     tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
                 );
-            }
+            // }
 
             if let Some(err) = extract_region_error(&v) {
                 resp.set_region_error(err);
@@ -1214,11 +1214,11 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                     }
                     if let Some(collector) = collector.take() {
                         let trace_details = collector.collect();
-                        if trace_details.elapsed_ns > 1_000_000 {
+                        // if trace_details.elapsed_ns > 1_000_000 {
                             resp.set_span_sets(
                                 tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
                             );
-                        }
+                        // }
                         // resp.set_span_results(tikv_util::trace::memcopy(span_sets));
                         // let _c = tikv_util::trace::memcopy(span_sets);
                         // resp.set_span_results(vec![0; 5000]);
