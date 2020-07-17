@@ -8,13 +8,12 @@ pub fn encode_spans(span_sets: Vec<SpanSet>) -> impl Iterator<Item = spanpb::Spa
             let mut pb_set = spanpb::SpanSet::default();
             pb_set.set_create_time_ns(span_set.create_time_ns);
             pb_set.set_start_time_ns(span_set.start_time_ns);
-            pb_set.set_cycles_per_sec(span_set.cycles_per_sec);
 
             let spans = span_set.spans.into_iter().map(|span| {
                 let mut s = spanpb::Span::default();
                 s.set_id(span.id);
                 s.set_begin_cycles(span.begin_cycles);
-                s.set_end_cycles(span.end_cycles);
+                s.set_end_cycles(span.elapsed_cycles);
                 s.set_event(span.event);
 
                 #[cfg(feature = "prost-codec")]
@@ -82,7 +81,7 @@ pub fn decode_spans(span_sets: Vec<spanpb::SpanSet>) -> impl Iterator<Item = Spa
                         Span {
                             id: span.id,
                             begin_cycles: span.begin_cycles,
-                            end_cycles: span.end_cycles,
+                            elapsed_cycles: span.end_cycles,
                             event: span.event,
                             link,
                         }
@@ -108,7 +107,7 @@ pub fn decode_spans(span_sets: Vec<spanpb::SpanSet>) -> impl Iterator<Item = Spa
                     Span {
                         id: span.id,
                         begin_cycles: span.begin_cycles,
-                        end_cycles: span.end_cycles,
+                        elapsed_cycles: span.end_cycles,
                         event: span.event,
                         link,
                     }
@@ -118,7 +117,6 @@ pub fn decode_spans(span_sets: Vec<spanpb::SpanSet>) -> impl Iterator<Item = Spa
         SpanSet {
             create_time_ns: span_set.create_time_ns,
             start_time_ns: span_set.start_time_ns,
-            cycles_per_sec: span_set.cycles_per_sec,
             spans,
         }
     })
@@ -129,7 +127,7 @@ pub fn memcopy(span_sets: Vec<SpanSet>) -> Vec<u8> {
         .iter()
         .map(|span_set| {
             span_set.spans.len() * std::mem::size_of::<minitrace::Span>()
-                + std::mem::size_of::<u64>() * 3
+                + std::mem::size_of::<u64>() * 2
         })
         .sum();
 
@@ -146,12 +144,6 @@ pub fn memcopy(span_sets: Vec<SpanSet>) -> Vec<u8> {
             cur_ptr = cur_ptr.offset(8);
             std::ptr::copy_nonoverlapping(
                 &span_set.start_time_ns as *const _ as *const u8,
-                cur_ptr,
-                8,
-            );
-            cur_ptr = cur_ptr.offset(8);
-            std::ptr::copy_nonoverlapping(
-                &span_set.cycles_per_sec as *const _ as *const u8,
                 cur_ptr,
                 8,
             );
@@ -177,20 +169,19 @@ mod tests {
                 SpanSet {
                     create_time_ns: 0,
                     start_time_ns: 1,
-                    cycles_per_sec: 100,
                     spans: vec![
                         Span {
                             id: 0,
                             link: Link::Root,
                             begin_cycles: 0,
-                            end_cycles: 10,
+                            elapsed_cycles: 10,
                             event: 0,
                         },
                         Span {
                             id: 1,
                             link: Link::Parent { id: 0 },
                             begin_cycles: 0,
-                            end_cycles: 9,
+                            elapsed_cycles: 9,
                             event: 1,
                         },
                     ],
@@ -198,20 +189,19 @@ mod tests {
                 SpanSet {
                     create_time_ns: 3,
                     start_time_ns: 2,
-                    cycles_per_sec: 100,
                     spans: vec![
                         Span {
                             id: 2,
                             link: Link::Continue { id: 0 },
                             begin_cycles: 10,
-                            end_cycles: 20,
+                            elapsed_cycles: 20,
                             event: 2,
                         },
                         Span {
                             id: 3,
                             link: Link::Parent { id: 2 },
                             begin_cycles: 20,
-                            end_cycles: 30,
+                            elapsed_cycles: 30,
                             event: 3,
                         },
                     ],
@@ -222,20 +212,19 @@ mod tests {
                 SpanSet {
                     create_time_ns: u64::MAX,
                     start_time_ns: u64::MAX,
-                    cycles_per_sec: u64::MAX,
                     spans: vec![
                         Span {
                             id: u64::MAX,
                             link: Link::Root,
                             begin_cycles: u64::MAX,
-                            end_cycles: u64::MAX,
+                            elapsed_cycles: u64::MAX,
                             event: u32::MAX,
                         },
                         Span {
                             id: u64::MAX,
                             link: Link::Parent { id: u64::MAX },
                             begin_cycles: u64::MAX,
-                            end_cycles: u64::MAX,
+                            elapsed_cycles: u64::MAX,
                             event: u32::MAX,
                         },
                     ],
@@ -243,12 +232,11 @@ mod tests {
                 SpanSet {
                     create_time_ns: u64::MAX,
                     start_time_ns: u64::MAX,
-                    cycles_per_sec: u64::MAX,
                     spans: vec![Span {
                         id: u64::MAX,
                         link: Link::Continue { id: u64::MAX },
                         begin_cycles: u64::MAX,
-                        end_cycles: u64::MAX,
+                        elapsed_cycles: u64::MAX,
                         event: u32::MAX,
                     }],
                 },

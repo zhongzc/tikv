@@ -420,8 +420,8 @@ impl<E: Engine> Endpoint<E> {
             .or_else(|e| Ok(make_error_response(e)))
             .map(move |mut resp| {
                 if let Some(collector) = collector {
-                    let span_sets = collector.collect();
-                    resp.set_spans(tikv_util::trace::encode_spans(span_sets).collect())
+                    let trace_details = collector.collect();
+                    resp.set_spans(tikv_util::trace::encode_spans(trace_details.span_sets).collect())
                 }
                 resp
             })
