@@ -1175,17 +1175,17 @@ fn future_get<E: Engine, L: LockManager>(
         .then(move |v| {
             let mut resp = GetResponse::default();
             let trace_details = collector.collect();
-            // if trace_details.elapsed_ns > 10_000_000 {
-            //     resp.set_span_sets(
-            //         tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
-            //     );
-            // }
+            if trace_details.elapsed_ns > 5_000_000 {
+                resp.set_span_sets(
+                    tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
+                );
+            }
             // tikv_util::trace::encode_spans(trace_details.span_sets)
             // .map(|span_set| span_set.write_to_bytes())
             // .for_each(drop);
-            if trace_details.elapsed_ns > 1_000_000 {
-                resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
-            }
+            // if trace_details.elapsed_ns > 1_000_000 {
+            //     resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
+            // }
             // resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
             // let _c = black_box(tikv_util::trace::memcopy(trace_details.span_sets));
 
@@ -1235,18 +1235,18 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                         // tikv_util::trace::encode_spans(trace_details.span_sets)
                         // .map(|span_set| span_set.write_to_bytes())
                         // .for_each(drop);
-                        // if trace_details.elapsed_ns > 10_000_000 {
-                        //     resp.set_span_sets(
-                        //         tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
-                        //     );
-                        // }
+                        if trace_details.elapsed_ns > 5_000_000 {
+                            resp.set_span_sets(
+                                tikv_util::trace::encode_spans(trace_details.span_sets).collect(),
+                            );
+                        }
                         // resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
                         // let _c = black_box(tikv_util::trace::memcopy(trace_details.span_sets));
-                        if trace_details.elapsed_ns > 1_000_000 {
-                            resp.set_span_results(tikv_util::trace::memcopy(
-                                trace_details.span_sets,
-                            ));
-                        }
+                        // if trace_details.elapsed_ns > 1_000_000 {
+                        //     resp.set_span_results(tikv_util::trace::memcopy(
+                        //         trace_details.span_sets,
+                        //     ));
+                        // }
                         // resp.set_span_results(vec![0; 5000]);
                     }
                     let mut res = batch_commands_response::Response::default();
