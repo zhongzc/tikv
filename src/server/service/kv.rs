@@ -1187,9 +1187,11 @@ fn future_get<E: Engine, L: LockManager>(
             //     resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
             // }
             // resp.set_span_results(tikv_util::trace::memcopy(trace_details.span_sets));
-            eprintln!("total: {} ms", trace_details.elapsed_ns as f64 / 1_000_000.0);
-            let c = tikv_util::trace::memcopy(trace_details.span_sets);
-            eprintln!("memcpy: {}", c.len());
+            let a: u32 = tikv_util::trace::encode_spans(trace_details.span_sets).map(|s| s.compute_size()).sum();
+            eprintln!("protobuf: {}", a);
+            // eprintln!("total: {} ms", trace_details.elapsed_ns as f64 / 1_000_000.0);
+            // let c = tikv_util::trace::memcopy(trace_details.span_sets);
+            // eprintln!("memcpy: {}", c.len());
 
             if let Some(err) = extract_region_error(&v) {
                 resp.set_region_error(err);
@@ -1251,9 +1253,12 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                         // }
                         // resp.set_span_results(vec![0; 5000]);
 
-                        eprintln!("total: {} ms", trace_details.elapsed_ns as f64 / 1_000_000.0);
-                        let c = tikv_util::trace::memcopy(trace_details.span_sets);
-                        eprintln!("memcpy: {}", c.len());
+                        let a: u32 = tikv_util::trace::encode_spans(trace_details.span_sets).map(|s| s.compute_size()).sum();
+                        eprintln!("protobuf: {}", a);
+
+                        // eprintln!("total: {} ms", trace_details.elapsed_ns as f64 / 1_000_000.0);
+                        // let c = tikv_util::trace::memcopy(trace_details.span_sets);
+                        // eprintln!("memcpy: {}", c.len());
                     }
                     let mut res = batch_commands_response::Response::default();
                     res.cmd = Some(batch_commands_response::response::Cmd::Get(resp));
