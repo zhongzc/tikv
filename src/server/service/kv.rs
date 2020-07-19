@@ -1193,7 +1193,7 @@ fn future_get<E: Engine, L: LockManager>(
             // let c = tikv_util::trace::memcopy(trace_details.span_sets);
             // eprintln!("memcpy: {}", c.len());
 
-            const RETURN_PASZ: usize = 1000;
+            const RETURN_PASZ: usize = 500;
             let mut b = Vec::with_capacity(RETURN_PASZ);
             for i in 0..RETURN_PASZ {
                 b.push(i as u8);
@@ -1258,7 +1258,7 @@ pub fn future_batch_get_command<E: Engine, L: LockManager>(
                         //         trace_details.span_sets,
                         //     ));
                         // }
-                        const RETURN_PASZ: usize = 1000;
+                        const RETURN_PASZ: usize = 500;
                         let mut b = Vec::with_capacity(RETURN_PASZ);
                         for i in 0..RETURN_PASZ {
                             b.push(i as u8);
