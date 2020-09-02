@@ -579,3 +579,9 @@ pipelined = true
 
 [cdc]
 min-ts-interval = "4s"
+
+[tracing]
+jaeger-thrift-compact-agent  = "example.com:6831"
+num-report-threads = 2
+duration-threshold = "10ms"
+spans-max-length = 200

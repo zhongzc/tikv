@@ -53,7 +53,7 @@ pub mod sys;
 pub mod threadpool;
 pub mod time;
 pub mod timer;
-pub mod trace;
+pub mod tracing;
 pub mod worker;
 
 static PANIC_WHEN_UNEXPECTED_KEY_OR_DATA: AtomicBool = AtomicBool::new(false);

@@ -26,6 +26,7 @@ use tikv::server::Config as ServerConfig;
 use tikv::storage::config::{BlockCacheConfig, Config as StorageConfig};
 use tikv_util::collections::HashSet;
 use tikv_util::config::{LogFormat, OptionReadableSize, ReadableDuration, ReadableSize};
+use tikv_util::tracing::Config as TracingConfig;
 
 mod dynamic;
 mod test_config_client;
@@ -656,6 +657,12 @@ fn test_serde_custom_tikv_config() {
     };
     value.cdc = CdcConfig {
         min_ts_interval: ReadableDuration::secs(4),
+    };
+    value.tracing = TracingConfig {
+        jaeger_thrift_compact_agent: "example.com:6831".to_owned(),
+        num_report_threads: 2,
+        duration_threshold: ReadableDuration::millis(10),
+        spans_max_length: 200,
     };
 
     let custom = read_file_in_project_dir("integrations/config/test-custom.toml");

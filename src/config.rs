@@ -54,6 +54,7 @@ use tikv_util::config::{
 use tikv_util::future_pool;
 use tikv_util::sys::sys_quota::SysQuota;
 use tikv_util::time::duration_to_sec;
+use tikv_util::tracing::Config as TracingConfig;
 
 const LOCKCF_MIN_MEM: usize = 256 * MB as usize;
 const LOCKCF_MAX_MEM: usize = GB as usize;
@@ -2103,6 +2104,9 @@ pub struct TiKvConfig {
 
     #[config(submodule)]
     pub cdc: CdcConfig,
+
+    #[config(submodule)]
+    pub tracing: TracingConfig,
 }
 
 impl Default for TiKvConfig {
@@ -2133,6 +2137,7 @@ impl Default for TiKvConfig {
             gc: GcConfig::default(),
             split: SplitConfig::default(),
             cdc: CdcConfig::default(),
+            tracing: TracingConfig::default(),
         }
     }
 }
@@ -2215,6 +2220,7 @@ impl TiKvConfig {
         self.backup.validate()?;
         self.pessimistic_txn.validate()?;
         self.gc.validate()?;
+        self.tracing.validate()?;
         Ok(())
     }
 
