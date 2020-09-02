@@ -1,12 +1,15 @@
 // Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::store::{CasualMessage, PeerMsg, RaftCommand, RaftRouter, StoreMessage};
+use crate::store::{CasualMessage, PeerMsg, RaftCommand, RaftRouter, StoreMsg};
 use crate::{DiscardReason, Error, Result};
 use crossbeam::TrySendError;
 use engine_traits::{KvEngine, Snapshot};
 use kvproto::raft_serverpb::RaftMessage;
 use raft_engine::RaftEngine;
 use std::sync::mpsc;
+use tikv_util::minitrace::context::Contextual;
+
+type StoreMessage = Contextual<StoreMsg>;
 
 /// Transports messages between different Raft peers.
 pub trait Transport: Send + Clone {

@@ -36,6 +36,7 @@ use raft_engine::RaftEngine;
 use sst_importer::SSTImporter;
 use tikv_util::collections::{HashMap, HashMapEntry, HashSet};
 use tikv_util::config::{Tracker, VersionTrack};
+use tikv_util::minitrace::context::Contextual;
 use tikv_util::mpsc::{loose_bounded, LooseBoundedSender, Receiver};
 use tikv_util::time::{duration_to_sec, Instant};
 use tikv_util::worker::Scheduler;
@@ -47,7 +48,7 @@ use uuid::Builder as UuidBuilder;
 use crate::coprocessor::{Cmd, CoprocessorHost};
 use crate::store::fsm::RaftPollerBuilder;
 use crate::store::metrics::*;
-use crate::store::msg::{Callback, PeerMessage, PeerMsg, ReadResponse, SignificantMsg};
+use crate::store::msg::{Callback, PeerMsg, ReadResponse, SignificantMsg};
 use crate::store::peer::Peer;
 use crate::store::peer_storage::{
     self, write_initial_apply_state, write_peer_state, ENTRY_MEM_SIZE,
@@ -64,6 +65,8 @@ use super::metrics::*;
 const DEFAULT_APPLY_WB_SIZE: usize = 4 * 1024;
 const APPLY_WB_SHRINK_SIZE: usize = 1024 * 1024;
 const SHRINK_PENDING_CMD_QUEUE_CAP: usize = 64;
+
+type PeerMessage<EK> = Contextual<PeerMsg<EK>>;
 
 pub struct PendingCmd<S>
 where
@@ -3514,6 +3517,7 @@ mod tests {
     use crate::store::{Config, RegionTask};
     use test_sst_importer::*;
     use tikv_util::config::VersionTrack;
+    use tikv_util::minitrace::context::UnwrapContext;
     use tikv_util::worker::dummy_scheduler;
 
     use super::*;
@@ -3660,11 +3664,11 @@ mod tests {
     fn fetch_apply_res(
         receiver: &::std::sync::mpsc::Receiver<PeerMessage<RocksEngine>>,
     ) -> ApplyRes<RocksSnapshot> {
-        match receiver.recv_timeout(Duration::from_secs(3)) {
-            Ok(PeerMessage {
-                msg: PeerMsg::ApplyRes { res, .. },
-                ..
-            }) => match res {
+        match receiver
+            .recv_timeout(Duration::from_secs(3))
+            .unwrap_context()
+        {
+            Ok(PeerMsg::ApplyRes { res, .. }) => match res {
                 TaskRes::Apply(res) => res,
                 e => panic!("unexpected res {:?}", e),
             },
@@ -3822,11 +3826,8 @@ mod tests {
                 Msg::Snapshot(GenSnapTask::new(2, 0, snap_tx)),
             ],
         );
-        let apply_res = match rx.recv_timeout(Duration::from_secs(3)) {
-            Ok(PeerMessage {
-                msg: PeerMsg::ApplyRes { res, .. },
-                ..
-            }) => match res {
+        let apply_res = match rx.recv_timeout(Duration::from_secs(3)).unwrap_context() {
+            Ok(PeerMsg::ApplyRes { res, .. }) => match res {
                 TaskRes::Apply(res) => res,
                 e => panic!("unexpected apply result: {:?}", e),
             },
@@ -3858,11 +3859,8 @@ mod tests {
         });
 
         router.schedule_task(2, Msg::destroy(2, false));
-        let (region_id, peer_id) = match rx.recv_timeout(Duration::from_secs(3)) {
-            Ok(PeerMessage {
-                msg: PeerMsg::ApplyRes { res, .. },
-                ..
-            }) => match res {
+        let (region_id, peer_id) = match rx.recv_timeout(Duration::from_secs(3)).unwrap_context() {
+            Ok(PeerMsg::ApplyRes { res, .. }) => match res {
                 TaskRes::Destroy {
                     region_id, peer_id, ..
                 } => (region_id, peer_id),

@@ -3,11 +3,11 @@
 use crossbeam::{SendError, TrySendError};
 use kvproto::raft_cmdpb::RaftCmdRequest;
 use kvproto::raft_serverpb::RaftMessage;
+use tikv_util::minitrace::context::Contextual;
 
 use crate::store::fsm::RaftRouter;
 use crate::store::{
-    Callback, CasualMessage, LocalReader, PeerMsg, RaftCommand, SignificantMsg, StoreMessage,
-    StoreMsg,
+    Callback, CasualMessage, LocalReader, PeerMsg, RaftCommand, SignificantMsg, StoreMsg,
 };
 use crate::{DiscardReason, Error as RaftStoreError, Result as RaftStoreResult};
 use engine_traits::KvEngine;
@@ -17,6 +17,8 @@ use std::cell::RefCell;
 use tikv_util::minitrace::{self, Event};
 use tikv_util::time::ThreadReadId;
 use txn_types::TxnExtra;
+
+type StoreMessage = Contextual<StoreMsg>;
 
 /// Routes messages to the raftstore.
 pub trait RaftStoreRouter<EK>: Send + Clone

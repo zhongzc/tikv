@@ -367,10 +367,6 @@ impl<S: Snapshot> RaftCommand<S> {
     }
 }
 
-pub struct Context {
-    pub trace_handle: minitrace::TraceHandle,
-}
-
 /// Message that can be sent to a peer.
 pub enum PeerMsg<EK: KvEngine> {
     /// Raft message is the message sent between raft nodes in the same
@@ -401,22 +397,6 @@ pub enum PeerMsg<EK: KvEngine> {
     UpdateReplicationMode,
 }
 
-pub struct PeerMessage<EK: KvEngine> {
-    pub msg: PeerMsg<EK>,
-    pub context: Context,
-}
-
-impl<EK: KvEngine> From<PeerMsg<EK>> for PeerMessage<EK> {
-    fn from(msg: PeerMsg<EK>) -> Self {
-        Self {
-            msg,
-            context: Context {
-                trace_handle: minitrace::trace_binder(),
-            },
-        }
-    }
-}
-
 impl<EK: KvEngine> fmt::Debug for PeerMsg<EK> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -435,12 +415,6 @@ impl<EK: KvEngine> fmt::Debug for PeerMsg<EK> {
             PeerMsg::HeartbeatPd => write!(fmt, "HeartbeatPd"),
             PeerMsg::UpdateReplicationMode => write!(fmt, "UpdateReplicationMode"),
         }
-    }
-}
-
-impl<EK: KvEngine> fmt::Debug for PeerMessage<EK> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.msg.fmt(f)
     }
 }
 
@@ -475,22 +449,6 @@ pub enum StoreMsg {
     UpdateReplicationMode(ReplicationStatus),
 }
 
-pub struct StoreMessage {
-    pub msg: StoreMsg,
-    pub context: Context,
-}
-
-impl From<StoreMsg> for StoreMessage {
-    fn from(msg: StoreMsg) -> Self {
-        Self {
-            msg,
-            context: Context {
-                trace_handle: minitrace::trace_binder(),
-            },
-        }
-    }
-}
-
 impl fmt::Debug for StoreMsg {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -514,11 +472,5 @@ impl fmt::Debug for StoreMsg {
             StoreMsg::Validate(_) => write!(fmt, "Validate config"),
             StoreMsg::UpdateReplicationMode(_) => write!(fmt, "UpdateReplicationMode"),
         }
-    }
-}
-
-impl fmt::Debug for StoreMessage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.msg.fmt(f)
     }
 }

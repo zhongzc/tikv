@@ -34,6 +34,7 @@ use raft_engine::{RaftEngine, RaftLogBatch};
 use sst_importer::SSTImporter;
 use tikv_util::collections::HashMap;
 use tikv_util::config::{Tracker, VersionTrack};
+use tikv_util::minitrace::context::{Contextual, UnwrapContext};
 use tikv_util::mpsc::{self, LooseBoundedSender, Receiver};
 use tikv_util::time::{duration_to_sec, Instant as TiInstant};
 use tikv_util::timer::SteadyTimer;
@@ -66,8 +67,8 @@ use crate::store::worker::{
 };
 use crate::store::PdTask;
 use crate::store::{
-    util, Callback, CasualMessage, GlobalReplicationState, MergeResultKind, PeerMessage, PeerMsg,
-    RaftCommand, SignificantMsg, SnapManager, StoreMessage, StoreMsg, StoreTick,
+    util, Callback, CasualMessage, GlobalReplicationState, MergeResultKind, PeerMsg, RaftCommand,
+    SignificantMsg, SnapManager, StoreMsg, StoreTick,
 };
 use crate::Result;
 use concurrency_manager::ConcurrencyManager;
@@ -78,6 +79,9 @@ const KV_WB_SHRINK_SIZE: usize = 256 * 1024;
 const RAFT_WB_SHRINK_SIZE: usize = 1024 * 1024;
 pub const PENDING_VOTES_CAP: usize = 20;
 const UNREACHABLE_BACKOFF: Duration = Duration::from_secs(10);
+
+type PeerMessage<EK> = Contextual<PeerMsg<EK>>;
+type StoreMessage = Contextual<StoreMsg>;
 
 pub struct StoreInfo<E> {
     pub engine: E,
@@ -214,36 +218,29 @@ where
         mut msg: RaftMessage,
     ) -> std::result::Result<(), TrySendError<RaftMessage>> {
         let id = msg.get_region_id();
-        match self.try_send(id, PeerMsg::RaftMessage(msg).into()) {
+        match self
+            .try_send(id, PeerMsg::RaftMessage(msg).into())
+            .unwrap_context()
+        {
             Either::Left(Ok(())) => return Ok(()),
-            Either::Left(Err(TrySendError::Full(PeerMessage {
-                msg: PeerMsg::RaftMessage(m),
-                ..
-            }))) => {
+            Either::Left(Err(TrySendError::Full(PeerMsg::RaftMessage(m)))) => {
                 return Err(TrySendError::Full(m));
             }
-            Either::Left(Err(TrySendError::Disconnected(PeerMessage {
-                msg: PeerMsg::RaftMessage(m),
-                ..
-            }))) => {
+            Either::Left(Err(TrySendError::Disconnected(PeerMsg::RaftMessage(m)))) => {
                 return Err(TrySendError::Disconnected(m));
             }
-            Either::Right(PeerMessage {
-                msg: PeerMsg::RaftMessage(m),
-                ..
-            }) => msg = m,
+            Either::Right(PeerMsg::RaftMessage(m)) => msg = m,
             _ => unreachable!(),
         }
-        match self.send_control(StoreMsg::RaftMessage(msg).into()) {
+        match self
+            .send_control(StoreMsg::RaftMessage(msg).into())
+            .unwrap_context()
+        {
             Ok(()) => Ok(()),
-            Err(TrySendError::Full(StoreMessage {
-                msg: StoreMsg::RaftMessage(m),
-                ..
-            })) => Err(TrySendError::Full(m)),
-            Err(TrySendError::Disconnected(StoreMessage {
-                msg: StoreMsg::RaftMessage(m),
-                ..
-            })) => Err(TrySendError::Disconnected(m)),
+            Err(TrySendError::Full(StoreMsg::RaftMessage(m))) => Err(TrySendError::Full(m)),
+            Err(TrySendError::Disconnected(StoreMsg::RaftMessage(m))) => {
+                Err(TrySendError::Disconnected(m))
+            }
             _ => unreachable!(),
         }
     }
@@ -254,16 +251,15 @@ where
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
         let region_id = cmd.request.get_header().get_region_id();
-        match self.send(region_id, PeerMsg::RaftCommand(cmd).into()) {
+        match self
+            .send(region_id, PeerMsg::RaftCommand(cmd).into())
+            .unwrap_context()
+        {
             Ok(()) => Ok(()),
-            Err(TrySendError::Full(PeerMessage {
-                msg: PeerMsg::RaftCommand(cmd),
-                ..
-            })) => Err(TrySendError::Full(cmd)),
-            Err(TrySendError::Disconnected(PeerMessage {
-                msg: PeerMsg::RaftCommand(cmd),
-                ..
-            })) => Err(TrySendError::Disconnected(cmd)),
+            Err(TrySendError::Full(PeerMsg::RaftCommand(cmd))) => Err(TrySendError::Full(cmd)),
+            Err(TrySendError::Disconnected(PeerMsg::RaftCommand(cmd))) => {
+                Err(TrySendError::Disconnected(cmd))
+            }
             _ => unreachable!(),
         }
     }
@@ -554,7 +550,7 @@ impl<'a, EK: KvEngine + 'static, ER: RaftEngine + 'static, T: Transport, C: PdCl
 
     fn handle_msgs(&mut self, msgs: &mut Vec<StoreMessage>) {
         for mut m in msgs.drain(..) {
-            let _g = m.context.trace_handle.trace_enable(0u32);
+            let _g = m.trace_handle.trace_enable(0u32);
             match m.msg {
                 StoreMsg::Tick(tick) => self.on_tick(tick),
                 StoreMsg::RaftMessage(msg) => {
@@ -1527,13 +1523,11 @@ impl<'a, EK: KvEngine, ER: RaftEngine, T: Transport, C: PdClient>
             .ctx
             .router
             .send(region_id, PeerMsg::RaftMessage(msg).into())
+            .unwrap_context()
         {
             Ok(()) | Err(TrySendError::Full(_)) => return Ok(()),
             Err(TrySendError::Disconnected(_)) if self.ctx.router.is_shutdown() => return Ok(()),
-            Err(TrySendError::Disconnected(PeerMessage {
-                msg: PeerMsg::RaftMessage(m),
-                ..
-            })) => msg = m,
+            Err(TrySendError::Disconnected(PeerMsg::RaftMessage(m))) => msg = m,
             e => panic!(
                 "[store {}] [region {}] unexpected redirect error: {:?}",
                 self.fsm.store.id, region_id, e
@@ -2026,13 +2020,12 @@ impl<'a, EK: KvEngine, ER: RaftEngine, T: Transport, C: PdClient>
                 "region_id" => region_id,
             );
             let gc_snap = PeerMsg::CasualMessage(CasualMessage::GcSnap { snaps }).into();
-            match self.ctx.router.send(region_id, gc_snap) {
+            match self.ctx.router.send(region_id, gc_snap).unwrap_context() {
                 Ok(()) => Ok(()),
                 Err(TrySendError::Disconnected(_)) if self.ctx.router.is_shutdown() => Ok(()),
-                Err(TrySendError::Disconnected(PeerMessage {
-                    msg: PeerMsg::CasualMessage(CasualMessage::GcSnap { snaps }),
-                    ..
-                })) => {
+                Err(TrySendError::Disconnected(PeerMsg::CasualMessage(
+                    CasualMessage::GcSnap { snaps },
+                ))) => {
                     // The snapshot exists because MsgAppend has been rejected. So the
                     // peer must have been exist. But now it's disconnected, so the peer
                     // has to be destroyed instead of being created.

@@ -31,6 +31,7 @@ use raft::{self, SnapshotStatus, INVALID_INDEX, NO_LIMIT};
 use raft::{Ready, StateRole};
 use raft_engine::RaftEngine;
 use tikv_util::collections::HashMap;
+use tikv_util::minitrace::context::Contextual;
 use tikv_util::minitrace::Event;
 use tikv_util::mpsc::{self, LooseBoundedSender, Receiver};
 use tikv_util::time::duration_to_sec;
@@ -57,11 +58,13 @@ use crate::store::worker::{
 };
 use crate::store::PdTask;
 use crate::store::{
-    util, AbstractPeer, CasualMessage, Config, MergeResultKind, PeerMessage, PeerMsg, PeerTicks,
-    RaftCommand, SignificantMsg, SnapKey, StoreMsg,
+    util, AbstractPeer, CasualMessage, Config, MergeResultKind, PeerMsg, PeerTicks, RaftCommand,
+    SignificantMsg, SnapKey, StoreMsg,
 };
 use crate::{Error, Result};
 use keys::{self, enc_end_key, enc_start_key};
+
+type PeerMessage<EK> = Contextual<PeerMsg<EK>>;
 
 const REGION_SPLIT_SKIP_MAX_COUNT: usize = 3;
 
@@ -442,7 +445,7 @@ where
 
     pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMessage<EK>>) {
         for mut m in msgs.drain(..) {
-            let _g = m.context.trace_handle.trace_enable(0u32);
+            let _g = m.trace_handle.trace_enable(0u32);
             match m.msg {
                 PeerMsg::RaftMessage(msg) => {
                     if let Err(e) = self.on_raft_message(msg) {
