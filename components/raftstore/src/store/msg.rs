@@ -105,6 +105,21 @@ where
             _ => false,
         }
     }
+
+    pub fn inject_ctx(contextual: Contextual<Self>) -> Self {
+        let ctx = contextual._ctx;
+        match contextual.value {
+            Callback::Write(w) => Callback::Write(Box::new(move |resp| {
+                let _ = ctx;
+                w(resp)
+            })),
+            Callback::Read(r) => Callback::Read(Box::new(move |resp| {
+                let _ = ctx;
+                r(resp)
+            })),
+            Callback::None => Callback::None,
+        }
+    }
 }
 
 impl<S> fmt::Debug for Callback<S>

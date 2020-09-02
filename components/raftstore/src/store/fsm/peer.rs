@@ -33,6 +33,7 @@ use raft_engine::RaftEngine;
 use tikv_util::collections::HashMap;
 use tikv_util::mpsc::{self, LooseBoundedSender, Receiver};
 use tikv_util::time::duration_to_sec;
+use tikv_util::trace::context::Contextual;
 use tikv_util::worker::{Scheduler, Stopped};
 use tikv_util::{escape, is_zero_duration, Either};
 
@@ -124,7 +125,7 @@ where
     raft_entry_max_size: f64,
     batch_req_size: u32,
     request: Option<RaftCmdRequest>,
-    callbacks: Vec<(Callback<E::Snapshot>, usize)>,
+    callbacks: Vec<(Contextual<Callback<E::Snapshot>>, usize)>,
 }
 
 impl<EK, ER> Drop for PeerFsm<EK, ER>
@@ -135,7 +136,7 @@ where
     fn drop(&mut self) {
         self.peer.stop();
         while let Ok(m) = self.receiver.try_recv() {
-            let callback = match m.msg {
+            let callback = match m.value {
                 PeerMsg::RaftCommand(cmd) => cmd.callback,
                 PeerMsg::CasualMessage(CasualMessage::SplitRegion { callback, .. }) => callback,
                 _ => continue,
@@ -330,7 +331,7 @@ where
         } else {
             self.request = Some(request);
         };
-        self.callbacks.push((callback, req_num));
+        self.callbacks.push((callback.into(), req_num));
         self.batch_req_size += req_size;
     }
 
@@ -353,7 +354,7 @@ where
             self.batch_req_size = 0;
             if self.callbacks.len() == 1 {
                 let (cb, _) = self.callbacks.pop().unwrap();
-                return Some(RaftCommand::new(req, cb));
+                return Some(RaftCommand::new(req, Callback::inject_ctx(cb)));
             }
             metric.batch += self.callbacks.len() - 1;
             let cbs = std::mem::replace(&mut self.callbacks, vec![]);
@@ -369,7 +370,7 @@ where
                             resp.response.get_responses()[last_index..next_index].into(),
                         );
                     }
-                    cb.invoke_with_response(cmd_resp);
+                    cb.value.invoke_with_response(cmd_resp);
                     last_index = next_index;
                 }
             }));
@@ -434,7 +435,7 @@ where
 
     pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMessage<EK>>) {
         for m in msgs.drain(..) {
-            match m.msg {
+            match m.value {
                 PeerMsg::RaftMessage(msg) => {
                     if let Err(e) = self.on_raft_message(msg) {
                         error!(
@@ -724,7 +725,8 @@ where
                         cb,
                     },
                 )
-            })),
+            }))
+            .into(),
         );
     }
 

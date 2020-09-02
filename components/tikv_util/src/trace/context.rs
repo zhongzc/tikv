@@ -5,24 +5,24 @@ use std::fmt;
 pub struct Contextual<T> {
     // TODO: place trace context here
     pub _ctx: (),
-    pub msg: T,
+    pub value: T,
 }
 
 impl<T: fmt::Debug> fmt::Debug for Contextual<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.msg.fmt(f)
+        self.value.fmt(f)
     }
 }
 
 impl<T: fmt::Display> fmt::Display for Contextual<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.msg.fmt(f)
+        self.value.fmt(f)
     }
 }
 
 impl<T> From<T> for Contextual<T> {
-    fn from(msg: T) -> Self {
-        Self { _ctx: (), msg }
+    fn from(value: T) -> Self {
+        Self { _ctx: (), value }
     }
 }
 
@@ -36,7 +36,7 @@ impl<T> UnwrapContext for Contextual<T> {
 
     #[inline]
     fn unwrap_context(self) -> Self::Target {
-        self.msg
+        self.value
     }
 }
 
