@@ -21,6 +21,7 @@ use crate::store::util::KeysInfoFormatter;
 use crate::store::SnapKey;
 use engine_rocks::CompactedEvent;
 use tikv_util::escape;
+use tikv_util::trace::context::Contextual;
 
 use super::{AbstractPeer, RegionSnapshot};
 
@@ -457,3 +458,6 @@ impl fmt::Debug for StoreMsg {
         }
     }
 }
+
+pub type PeerMessage<EK> = Contextual<PeerMsg<EK>>;
+pub type StoreMessage = Contextual<StoreMsg>;

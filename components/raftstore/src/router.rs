@@ -233,7 +233,7 @@ impl<EK: KvEngine, ER: RaftEngine> RaftStoreRouter<EK> for RaftRouter<EK, ER> {
     ) -> RaftStoreResult<()> {
         if let Err(SendError(msg)) = self
             .router
-            .force_send(region_id, PeerMsg::SignificantMsg(msg))
+            .force_send(region_id, PeerMsg::SignificantMsg(msg).into())
         {
             // TODO: panic here once we can detect system is shutting down reliably.
             error!("failed to send significant msg"; "msg" => ?msg);

@@ -55,8 +55,8 @@ use crate::store::worker::{
 };
 use crate::store::PdTask;
 use crate::store::{
-    util, AbstractPeer, CasualMessage, Config, MergeResultKind, PeerMsg, PeerTicks, RaftCommand,
-    SignificantMsg, SnapKey, StoreMsg,
+    util, AbstractPeer, CasualMessage, Config, MergeResultKind, PeerMessage, PeerMsg, PeerTicks,
+    RaftCommand, SignificantMsg, SnapKey, StoreMsg,
 };
 use crate::{Error, Result};
 use keys::{self, enc_end_key, enc_start_key};
@@ -105,7 +105,7 @@ where
     has_ready: bool,
     early_apply: bool,
     mailbox: Option<BasicMailbox<PeerFsm<EK, ER>>>,
-    pub receiver: Receiver<PeerMsg<EK>>,
+    pub receiver: Receiver<PeerMessage<EK>>,
     /// when snapshot is generating or sending, skip split check at most REGION_SPLIT_SKIT_MAX_COUNT times.
     skip_split_count: usize,
     /// Sometimes applied raft logs won't be compacted in time, because less compact means less
@@ -134,8 +134,8 @@ where
 {
     fn drop(&mut self) {
         self.peer.stop();
-        while let Ok(msg) = self.receiver.try_recv() {
-            let callback = match msg {
+        while let Ok(m) = self.receiver.try_recv() {
+            let callback = match m.msg {
                 PeerMsg::RaftCommand(cmd) => cmd.callback,
                 PeerMsg::CasualMessage(CasualMessage::SplitRegion { callback, .. }) => callback,
                 _ => continue,
@@ -151,7 +151,7 @@ where
     }
 }
 
-pub type SenderFsmPair<EK, ER> = (LooseBoundedSender<PeerMsg<EK>>, Box<PeerFsm<EK, ER>>);
+pub type SenderFsmPair<EK, ER> = (LooseBoundedSender<PeerMessage<EK>>, Box<PeerFsm<EK, ER>>);
 
 impl<EK, ER> PeerFsm<EK, ER>
 where
@@ -384,7 +384,7 @@ where
     EK: KvEngine,
     ER: RaftEngine,
 {
-    type Message = PeerMsg<EK>;
+    type Message = PeerMessage<EK>;
 
     #[inline]
     fn is_stopped(&self) -> bool {
@@ -432,9 +432,9 @@ where
         PeerFsmDelegate { fsm, ctx }
     }
 
-    pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMsg<EK>>) {
+    pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMessage<EK>>) {
         for m in msgs.drain(..) {
-            match m {
+            match m.msg {
                 PeerMsg::RaftMessage(msg) => {
                     if let Err(e) = self.on_raft_message(msg) {
                         error!(
@@ -961,7 +961,7 @@ where
                     // This can happen only when the peer is about to be destroyed
                     // or the node is shutting down. So it's OK to not to clean up
                     // registry.
-                    if let Err(e) = mb.force_send(PeerMsg::Tick(tick)) {
+                    if let Err(e) = mb.force_send(PeerMsg::Tick(tick).into()) {
                         debug!(
                             "failed to schedule peer tick";
                             "region_id" => region_id,
@@ -1354,7 +1354,7 @@ where
                             if let Err(e) = self
                                 .ctx
                                 .router
-                                .send_control(StoreMsg::RaftMessage(msg.clone()))
+                                .send_control(StoreMsg::RaftMessage(msg.clone()).into())
                             {
                                 info!(
                                     "failed to send back store message, are we shutting down?";
@@ -1629,7 +1629,7 @@ where
                 // may has been merged/splitted already.
                 let _ = self.ctx.router.force_send(
                     exist_region.get_id(),
-                    PeerMsg::CasualMessage(CasualMessage::RegionOverlapped),
+                    PeerMsg::CasualMessage(CasualMessage::RegionOverlapped).into(),
                 );
             }
         }
@@ -1712,7 +1712,8 @@ where
                         target_region_id: self.fsm.region_id(),
                         target: self.fsm.peer.peer.clone(),
                         result,
-                    }),
+                    })
+                    .into(),
                 )
                 .unwrap();
         }
@@ -2157,7 +2158,7 @@ where
             self.ctx.router.register(new_region_id, mailbox);
             self.ctx
                 .router
-                .force_send(new_region_id, PeerMsg::Start)
+                .force_send(new_region_id, PeerMsg::Start.into())
                 .unwrap();
 
             if !campaigned {
@@ -2168,7 +2169,7 @@ where
                     if let Err(e) = self
                         .ctx
                         .router
-                        .force_send(new_region_id, PeerMsg::RaftMessage(msg))
+                        .force_send(new_region_id, PeerMsg::RaftMessage(msg).into())
                     {
                         warn!("handle first requset vote failed"; "region_id" => region_id, "error" => ?e);
                     }
@@ -2384,7 +2385,7 @@ where
             .router
             .force_send(
                 target_id,
-                PeerMsg::RaftCommand(RaftCommand::new(request, Callback::None)),
+                PeerMsg::RaftCommand(RaftCommand::new(request, Callback::None)).into(),
             )
             .map_err(|_| Error::RegionNotFound(target_id))
     }
@@ -2610,7 +2611,8 @@ where
                 target_region_id: self.fsm.region_id(),
                 target: self.fsm.peer.peer.clone(),
                 result: MergeResultKind::FromTargetLog,
-            }),
+            })
+            .into(),
         ) {
             if !self.ctx.router.is_shutdown() {
                 panic!(
@@ -2857,7 +2859,8 @@ where
                     target_region_id: self.fsm.region_id(),
                     target: self.fsm.peer.peer.clone(),
                     result: MergeResultKind::FromTargetSnapshotStep2,
-                }),
+                })
+                .into(),
             ) {
                 if !self.ctx.router.is_shutdown() {
                     panic!("{} failed to send merge result(FromTargetSnapshotStep2) to source region {}, err {}", self.fsm.peer.tag, r.get_id(), e);

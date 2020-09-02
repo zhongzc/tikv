@@ -47,7 +47,10 @@ where
 {
     #[inline]
     fn send(&self, region_id: u64, msg: CasualMessage<EK>) -> Result<()> {
-        match self.router.send(region_id, PeerMsg::CasualMessage(msg)) {
+        match self
+            .router
+            .send(region_id, PeerMsg::CasualMessage(msg).into())
+        {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(_)) => Err(Error::Transport(DiscardReason::Full)),
             Err(TrySendError::Disconnected(_)) => Err(Error::RegionNotFound(region_id)),
@@ -76,7 +79,7 @@ where
 {
     #[inline]
     fn send(&self, msg: StoreMsg) -> Result<()> {
-        match self.send_control(msg) {
+        match self.send_control(msg.into()) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(_)) => Err(Error::Transport(DiscardReason::Full)),
             Err(TrySendError::Disconnected(_)) => {

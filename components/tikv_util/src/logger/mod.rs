@@ -757,10 +757,10 @@ mod tests {
     ///
     /// ```ignore
     /// assert_eq!(true, validate_log_source_file("<unknown>", "<unknown>"));
-    /// assert_eq!(true, validate_log_source_file("mod.rs:1", "mod.rs:1"));
-    /// assert_eq!(true, validate_log_source_file("mod.rs:1", "mod.rs:100"));
-    /// assert_eq!(false, validate_log_source_file("mod.rs:1", "<unknown>"));
-    /// assert_eq!(false, validate_log_source_file("mod.rs:1", "mod.rs:NAN"));
+    /// assert_eq!(true, validate_log_source_file("trace:1", "trace:1"));
+    /// assert_eq!(true, validate_log_source_file("trace:1", "trace:100"));
+    /// assert_eq!(false, validate_log_source_file("trace:1", "<unknown>"));
+    /// assert_eq!(false, validate_log_source_file("trace:1", "trace:NAN"));
     /// ```
     fn validate_log_source_file(output: &str, expect: &str) -> bool {
         if expect.eq(output) {

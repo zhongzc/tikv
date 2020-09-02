@@ -719,7 +719,7 @@ where
             match resp.await {
                 Ok(mut resp) => {
                     if let Some(status) = resp.replication_status.take() {
-                        let _ = router.send_control(StoreMsg::UpdateReplicationMode(status));
+                        let _ = router.send_control(StoreMsg::UpdateReplicationMode(status).into());
                     }
                 }
                 Err(e) => {
@@ -867,7 +867,7 @@ where
                             policy: split_region.get_policy(),
                         }
                     };
-                    if let Err(e) = router.send(region_id, PeerMsg::CasualMessage(msg)) {
+                    if let Err(e) = router.send(region_id, PeerMsg::CasualMessage(msg).into()) {
                         error!("send halfsplit request failed"; "region_id" => region_id, "err" => ?e);
                     }
                 } else if resp.has_merge() {

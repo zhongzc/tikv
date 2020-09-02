@@ -30,7 +30,7 @@ lazy_static! {
         .workspace_root;
     static ref FUZZ_ROOT: PathBuf = WORKSPACE_ROOT.join("fuzz");
     static ref FUZZ_TARGETS: Vec<String> = {
-        let source = FUZZ_ROOT.join("targets/mod.rs");
+        let source = FUZZ_ROOT.join("targets/trace");
         let targets_rs = fs::read_to_string(&source).unwrap();
         let match_fuzz_fs = regex::Regex::new(r"pub fn fuzz_(\w+)\(").unwrap();
         let target_names = match_fuzz_fs
