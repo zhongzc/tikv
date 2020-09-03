@@ -147,6 +147,10 @@ macro_rules! requests_to_trace {
             $(($name, $enable: expr) => { minitrace::trace_may_enable($enable, $event as u32) };)*
             ($_: ident, $__: expr) => { minitrace::trace_may_enable(false, 0u32) }
         }
+        macro_rules! trace_event {
+            $(($name) => { $event as u32 };)*
+            ($_: ident) => { 0u32 }
+        }
     }
 }
 
@@ -178,7 +182,7 @@ macro_rules! handle_request {
 
             let resp = $future_name(&self.storage, req);
             let task = async move {
-                let resp = resp.await?;
+                let resp = resp.trace_async(trace_event!($fn_name)).await?;
                 sink.success(resp).compat().await?;
                 GRPC_MSG_HISTOGRAM_STATIC
                     .$fn_name
@@ -354,7 +358,7 @@ impl<
 
         let future = future_cop(&self.cop, Some(ctx.peer()), req);
         let task = async move {
-            let resp = future.await?;
+            let resp = future.trace_async(trace_event!(coprocessor)).await?;
             sink.success(resp).compat().await?;
             reporter.report(req_trace_context, collector);
             GRPC_MSG_HISTOGRAM_STATIC
@@ -368,7 +372,8 @@ impl<
                 "err" => ?e
             );
             GRPC_MSG_FAIL_COUNTER.coprocessor.inc();
-        });
+        })
+        .trace_task(Event::TiKvGrpcio as u32);
 
         ctx.spawn(Compat::new(task.boxed()));
     }
