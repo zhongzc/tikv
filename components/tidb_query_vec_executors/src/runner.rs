@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use kvproto::coprocessor::KeyRange;
 use tidb_query_datatype::{EvalType, FieldTypeAccessor};
 use tikv_util::deadline::Deadline;
+use tikv_util::minitrace::{self, prelude::*, Event};
 use tipb::StreamResponse;
 use tipb::{self, ExecType, ExecutorExecutionSummary, FieldType};
 use tipb::{Chunk, DagRequest, EncodeType, SelectResponse};
@@ -373,7 +374,9 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
             let time_slice_len = time_slice_start.elapsed();
             // Check whether we should yield from the execution
             if time_slice_len > MAX_TIME_SLICE {
-                reschedule().await;
+                reschedule()
+                    .trace_async(Event::TiKvCoprHandleRequestReschedule as u32)
+                    .await;
                 time_slice_start = Instant::now();
             }
 
@@ -494,7 +497,9 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
 
         self.deadline.check()?;
 
+        let guard = minitrace::new_span(Event::TiKvCoprExecutorNextBatch as u32);
         let mut result = self.out_most_executor.next_batch(batch_size);
+        drop(guard);
 
         let is_drained = result.is_drained?;
 

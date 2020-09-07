@@ -123,7 +123,9 @@ impl JaegerReporter {
                     }
                     #[cfg(feature = "prost-codec")]
                     {
-                        Event::from_i32(s.event as _).map(|e| format!("{:?}",e)).unwrap_or(String::new())
+                        Event::from_i32(s.event as _)
+                            .map(|e| format!("{:?}", e))
+                            .unwrap_or(String::new())
                     }
                 },
             },
