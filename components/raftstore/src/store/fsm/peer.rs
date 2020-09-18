@@ -31,7 +31,7 @@ use raft::{self, SnapshotStatus, INVALID_INDEX, NO_LIMIT};
 use raft::{Ready, StateRole};
 use raft_engine::RaftEngine;
 use tikv_util::collections::HashMap;
-use tikv_util::minitrace::Event;
+use tikv_util::minitrace::{self, Event};
 use tikv_util::mpsc::{self, LooseBoundedSender, Receiver};
 use tikv_util::time::duration_to_sec;
 use tikv_util::worker::{Scheduler, Stopped};
@@ -459,7 +459,7 @@ where
                     }
                 }
                 PeerMsg::RaftCommand(mut cmd) => {
-                    let _g = m
+                    let _g0 = m
                         .context
                         .trace_handle
                         .trace_enable(Event::TiKvHandlePeerRaftCommand as u32);
@@ -469,13 +469,13 @@ where
                         .request_wait_time
                         .observe(duration_to_sec(cmd.send_time.elapsed()) as f64);
                     let req_size = cmd.request.compute_size();
+                    let _g1 = minitrace::new_span(Event::TiKvRaftStoreProposeRaftCommand as u32);
+                    // The batched command will execute in the future.
+                    // Instrument this command with a new tracing context.
+                    cmd.callback = cmd
+                        .callback
+                        .trace_instrument(Event::TiKvRaftStoreRaftCommand);
                     if self.fsm.batch_req_builder.can_batch(&cmd.request, req_size) {
-                        // The batched command will execute in the future.
-                        // Instrument this command with a new tracing context.
-                        cmd.callback = cmd
-                            .callback
-                            .trace_instrument(Event::TiKvRaftStoreRaftCommand);
-
                         self.fsm.batch_req_builder.add(cmd, req_size);
                         if self.fsm.batch_req_builder.should_finish() {
                             self.propose_batch_raft_command();
