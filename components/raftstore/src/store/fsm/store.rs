@@ -742,6 +742,10 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport, C: PdClient> PollHandler<PeerFs
     for RaftPoller<EK, ER, T, C>
 {
     fn begin(&mut self, _batch_size: usize) {
+        let (root_guard, collector) = minitrace::start_trace(0, 0u32);
+
+        let _child_guard = minitrace::new_span(TiKvRaftPollerBegin as u32);
+
         self.previous_metrics = self.poll_ctx.raft_metrics.clone();
         self.poll_ctx.pending_count = 0;
         self.poll_ctx.sync_log = false;
@@ -768,6 +772,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport, C: PdClient> PollHandler<PeerFs
             }
             self.poll_ctx.cfg = incoming.clone();
         }
+        let trace_results = collector.finish();
     }
 
     fn handle_control(&mut self, store: &mut StoreFsm) -> Option<usize> {
