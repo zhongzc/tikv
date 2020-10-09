@@ -34,7 +34,7 @@ use raft_engine::{RaftEngine, RaftLogBatch};
 use sst_importer::SSTImporter;
 use tikv_util::collections::HashMap;
 use tikv_util::config::{Tracker, VersionTrack};
-use tikv_util::minitrace::Event;
+use tikv_util::minitrace::{self,Event};
 use tikv_util::mpsc::{self, LooseBoundedSender, Receiver};
 use tikv_util::time::{duration_to_sec, Instant as TiInstant};
 use tikv_util::timer::SteadyTimer;
@@ -249,6 +249,7 @@ where
         }
     }
 
+    #[minitrace::trace(Event::TiKvRaftStoreRaftRouterSendCommand as u32)]
     #[inline]
     pub fn send_raft_command(
         &self,
@@ -742,10 +743,6 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport, C: PdClient> PollHandler<PeerFs
     for RaftPoller<EK, ER, T, C>
 {
     fn begin(&mut self, _batch_size: usize) {
-        let (root_guard, collector) = minitrace::start_trace(0, 0u32);
-
-        let _child_guard = minitrace::new_span(TiKvRaftPollerBegin as u32);
-
         self.previous_metrics = self.poll_ctx.raft_metrics.clone();
         self.poll_ctx.pending_count = 0;
         self.poll_ctx.sync_log = false;
@@ -772,7 +769,6 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport, C: PdClient> PollHandler<PeerFs
             }
             self.poll_ctx.cfg = incoming.clone();
         }
-        let trace_results = collector.finish();
     }
 
     fn handle_control(&mut self, store: &mut StoreFsm) -> Option<usize> {

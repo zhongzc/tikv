@@ -31,7 +31,7 @@ use raft::{self, SnapshotStatus, INVALID_INDEX, NO_LIMIT};
 use raft::{Ready, StateRole};
 use raft_engine::RaftEngine;
 use tikv_util::collections::HashMap;
-use tikv_util::minitrace::{self, Event};
+use tikv_util::minitrace::{self, prelude::*,Event};
 use tikv_util::mpsc::{self, LooseBoundedSender, Receiver};
 use tikv_util::time::duration_to_sec;
 use tikv_util::worker::{Scheduler, Stopped};
@@ -440,6 +440,7 @@ where
         PeerFsmDelegate { fsm, ctx }
     }
 
+    #[minitrace::trace(Event::TiKvRaftStorePeerFsmHandleMessage as u32)]
     pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMessage<EK>>) {
         for m in msgs.drain(..) {
             match m.msg {
@@ -933,6 +934,7 @@ where
         self.fsm.peer.peer.get_store_id()
     }
 
+    #[minitrace::trace(Event::TiKvRaftStoreScheduleTickPending as u32)]
     #[inline]
     fn schedule_tick(&mut self, tick: PeerTicks, timeout: Duration) {
         if self.fsm.tick_registry.contains(tick) {
@@ -994,7 +996,7 @@ where
                     region_id, peer_id, tick, e
                 );
             });
-        self.ctx.future_poller.spawn(f).unwrap();
+        self.ctx.future_poller.spawn(f.trace_async(Event::TiKvRaftStoreScheduleTick as u32)).unwrap();
     }
 
     fn register_raft_base_tick(&mut self) {

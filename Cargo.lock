@@ -4890,7 +4890,7 @@ dependencies = [
 [[package]]
 name = "tipb"
 version = "0.0.1"
-source = "git+https://github.com/zhongzc/tipb.git?rev=6d5031f23e728be1a59a3b3b05b04a45384cd5a9#6d5031f23e728be1a59a3b3b05b04a45384cd5a9"
+source = "git+https://github.com/zhongzc/tipb.git?rev=8ae011f6e5fb7f1382ecccdadbb02a440e5acc72#8ae011f6e5fb7f1382ecccdadbb02a440e5acc72"
 dependencies = [
  "lazy_static",
  "prost",
