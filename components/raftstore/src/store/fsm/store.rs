@@ -34,7 +34,7 @@ use raft_engine::{RaftEngine, RaftLogBatch};
 use sst_importer::SSTImporter;
 use tikv_util::collections::HashMap;
 use tikv_util::config::{Tracker, VersionTrack};
-use tikv_util::minitrace::Event;
+use tikv_util::minitrace::{self,Event};
 use tikv_util::mpsc::{self, LooseBoundedSender, Receiver};
 use tikv_util::time::{duration_to_sec, Instant as TiInstant};
 use tikv_util::timer::SteadyTimer;
@@ -249,6 +249,7 @@ where
         }
     }
 
+    #[minitrace::trace(Event::TiKvRaftStoreRaftRouterSendCommand as u32)]
     #[inline]
     pub fn send_raft_command(
         &self,
