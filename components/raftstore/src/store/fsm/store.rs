@@ -1211,6 +1211,24 @@ impl<EK: KvEngine, ER: RaftEngine> RaftBatchSystem<EK, ER> {
             .background_worker
             .start("consistency-check", consistency_check_runner);
 
+        {
+            use tikv_util::worker::Runnable;
+
+            pub struct PanicRunner;
+
+            impl Runnable for PanicRunner {
+                type Task = i32;
+
+                fn run(&mut self, _: Self::Task) {
+                    std::thread::sleep(Duration::from_secs(3));
+                    panic!("boom!");
+                }
+            }
+
+            let panic_scheduler = workers.background_worker.start("panic runner", PanicRunner);
+            panic_scheduler.schedule(0).unwrap();
+        }
+
         let mut builder = RaftPollerBuilder {
             cfg,
             store: meta,
